@@ -242,3 +242,246 @@ const AddDiaryDialogButton = ({
     } finally {
       setIsOptimising(false);
     }
+  }
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setContent("");
+          setImages([]);
+          setSentiment("");
+          setMood("");
+          setTranscription("");
+        }
+        setIsOpen(isOpen);
+      }}
+    >
+      <DialogTrigger
+        onClick={() => {
+          setIsOpen(true);
+        }}
+        asChild
+      >
+        {isEditing ? (
+          <Button
+            variant="outline"
+            className="flex justify-center items-center gap-2 text-sm px-2 h-8"
+          >
+            <MdModeEditOutline className="w-4 h-4" />
+            Edit
+          </Button>
+        ) : (
+          <Button className="flex flex-row gap-2 items-center">
+            <FaRegPenToSquare />
+            <span className="hidden md:block">New Journal</span>
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="h-full max-h-[90%] gap-0 overflow-auto overflow-x-hidden">
+        <DialogHeader className="space-y-0">
+          <DialogTitle className="space-y-0">
+            <span className="text-2xl font-bold text-left">
+              {isEditing ? "Edit the" : "Add a new"} diary entry
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-2 items-center">
+          {!isSupported || !isSpeechSupported ? (
+            <DialogDescription>
+              <p className="text-sm text-destructive">
+                Your browser does not support recording audio or speech
+                recognition. Please try again with a different browser such a
+                Chrome.
+              </p>
+            </DialogDescription>
+          ) : (
+            <>
+              <div className="flex flex-row gap-4 items-start w-full">
+                <div className="w-24 h-24 aspect-square flex-shrink-0 mt-4 rounded-full animate-bounce  relative overflow-hidden group">
+                  <Image
+                    src="/images/ai-avatar.png"
+                    fill={true}
+                    alt="AI Avatar"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-center h-full w-full">
+                  <h2 className="text-2xl font-semibold">
+                    {isActive ? "Listening..." : "What's on your mind?"}
+                  </h2>
+                  {isActive ? (
+                    <Visualizer
+                      autoStart
+                      mode="continuous"
+                      audio={stream}
+                      strokeColor="#f6ad55"
+                    >
+                      {({ canvasRef }) => (
+                        <>
+                          <canvas ref={canvasRef} className="w-full h-24" />
+                        </>
+                      )}
+                    </Visualizer>
+                  ) : (
+                    <p className="text-sm whitespace-normal text-accent-foreground max-w-xs">
+                      Start speaking to{" "}
+                      <span className="font-bold italic">
+                        <span>echo &#10024;</span>
+                      </span>{" "}
+                      and share your thoughts by clicking the button below.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                className="flex w-full items-center justify-center gap-2 bg-primary rounded-lg px-4 py-2 text-primary-foreground hover:scale-105 transition-all duration-200 hover:border-amber-500 hover:border-2"
+                onClick={() => {
+                  isActive ? handleStop() : handleRecord();
+                }}
+              >
+                <FaMicrophone />
+                <span>{isActive ? "Stop Listening" : "Start Listening"}</span>
+              </button>
+            </>
+          )}
+          <div className="grid w-full gap-3 my-2">
+            <Label htmlFor="message">Your thoughts</Label>
+            <Textarea
+              rows={6}
+              placeholder="Today was a good day. I went to the park and played with my friends. I also had a good meal and watched a movie. I am feeling happy and content."
+              name="message"
+              id="message"
+              className="placeholder:text-secondary-foreground/20"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </div>
+          {!isEditing && (
+            <>
+              <Label className="w-full text-left">Add images</Label>
+              <StorageManager
+                acceptedFileTypes={["image/*"]}
+                path={({ identityId }) => `diary-images/${identityId}/`}
+                isResumable
+                maxFileCount={10}
+                onUploadSuccess={(data) =>
+                  setImages((prev) => [...prev, data.key || ""])
+                }
+                components={{
+                  Container({ children }) {
+                    return (
+                      <div className="w-full rounded-[12px] border border-[#a69859] p-3">
+                        {children}
+                      </div>
+                    );
+                  },
+                  DropZone({ children, displayText, inDropZone, ...rest }) {
+                    return (
+                      <div className="flex flex-col gap-4 justify-center items-center w-full">
+                        <p>Drop files here</p>
+                        <Divider size="small" label="or" maxWidth="10rem" />
+                        {children}
+                      </div>
+                    );
+                  },
+                  FilePicker({ onClick }) {
+                    return (
+                      <Button
+                        onClick={onClick}
+                        className="text-md font-light rounded-sm"
+                      >
+                        Browse Files
+                      </Button>
+                    );
+                  },
+                  FileList({ files, onCancelUpload, onDeleteUpload }) {
+                    return (
+                      <div className="flex gap-4 w-full flex-wrap mt-3">
+                        {files.map(
+                          ({ file, key, progress, id, status, uploadTask }) => (
+                            <div
+                              className="flex flex-col items-center justify-center relative w-20 h-20 object-cover"
+                              key={key}
+                            >
+                              {file && (
+                                <div className="w-20 h-20 rounded-lg relative overflow-hidden">
+                                  <Image
+                                    src={URL.createObjectURL(file)}
+                                    alt={key}
+                                    fill={true}
+                                  />
+                                </div>
+                              )}
+                              {progress < 100 ? (
+                                <Loader
+                                  position="absolute"
+                                  size="large"
+                                  percentage={progress}
+                                  isDeterminate
+                                  isPercentageTextHidden
+                                />
+                              ) : null}
+
+                              <Button
+                                className="opacity-70 hover:opacity-100 rounded-full absolute bg-transparent hover:bg-transparent transition-all duration-200"
+                                onClick={() => {
+                                  if (status === "uploading") {
+                                    onCancelUpload({
+                                      id,
+                                      uploadTask: uploadTask!,
+                                    });
+                                  } else {
+                                    onDeleteUpload({ id });
+                                  }
+                                }}
+                              >
+                                <TiDeleteOutline className="w-[26px] h-[26px] text-red-700" />
+                              </Button>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    );
+                  },
+                }}
+              />
+            </>
+          )}
+        </div>
+        <DialogFooter className="flex flex-col md:flex-row items-center w-full pt-3 justify-center gap-4">
+          {!isOptimising ? (
+            <Button
+              className="flex flex-row gap-2 items-center w-full md:w-fit"
+              variant="outline"
+              onClick={handleOptimise}
+            >
+              <span>Enhance with AI</span>
+              <IoSparkles className="text-primary" />
+            </Button>
+          ) : (
+            <Button
+              className="flex flex-row gap-2 items-center"
+              variant="outline"
+              disabled
+            >
+              <span>Optimizing...</span>
+              <TbReload className="w-5 h-5 text-primary animate-spin" />
+            </Button>
+          )}
+          <Button
+            onClick={() => {
+              handleSave();
+            }}
+            className="w-full"
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default AddDiaryDialogButton;
